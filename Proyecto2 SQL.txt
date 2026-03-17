@@ -1,0 +1,270 @@
+/*
+//Proyecto 2. Programa SQL. NOTA: DEJO NOMBRE DE PRUEBA6, YA QUE EL CODIGO FINAL SE ENTREGA CON EL GRUPO. ESTE ES MI AVANCE ENTREGADO AL CHAT GRUPAL
+//Autor: Leiber Aguero */
+
+/*--Se crea la base de datos*/
+CREATE DATABASE Prueba6
+
+/*--Se ingresa la base de datos*/
+USE Prueba6;
+
+
+
+-- CREACIÓN DE TABLAS --
+
+-- Tabla de Usuarios --
+CREATE TABLE Usuarios(
+	UsuarioID INT IDENTITY(1,1) PRIMARY KEY,
+	CedulaID VARCHAR(50) UNIQUE NOT NULL,
+	Nombre VARCHAR(100) NOT NULL,
+	CorreoElectronico VARCHAR(100) UNIQUE NOT NULL,
+	Telefono VARCHAR(20)
+	);
+
+-- Tabla de Equipos --
+CREATE TABLE Equipos(
+	EquipoID INT IDENTITY(1,1) PRIMARY KEY,
+	Modelo VARCHAR(100) NOT NULL,
+	Marca VARCHAR(100),
+	UsuarioID INT,
+	FOREIGN KEY (UsuarioID) REFERENCES Usuarios(UsuarioID)
+	);
+
+-- Tabla de tecnicos --
+CREATE TABLE Tecnicos(
+	TecnicoID INT IDENTITY(1,1) PRIMARY KEY,
+	Nombre VARCHAR(100) NOT NULL,
+	Especialidad VARCHAR(100)
+	);
+
+-- Tabla de Reparaciones --
+CREATE TABLE Reparaciones(
+	ReparacionID INT IDENTITY(1,1) PRIMARY KEY,
+	EquipoID INT,
+	FechaSolicitud DATETIME,
+	Estado VARCHAR(50) DEFAULT 'Pendiente',
+	FOREIGN KEY (EquipoID) REFERENCES Equipos(EquipoID)
+	);
+
+-- Tabla de Asignaciones --
+CREATE TABLE Asignaciones(
+	AsignacionID INT IDENTITY(1,1) PRIMARY KEY,
+	ReparacionID INT,
+	TecnicoID INT,
+	FOREIGN KEY (ReparacionID) REFERENCES Reparaciones(ReparacionID),
+	FOREIGN KEY (TecnicoID) REFERENCES Tecnicos(TecnicoID)
+	);
+
+-- Tabla de DetallesReparacion --
+CREATE TABLE DetallesReparacion(
+	DetalleID INT IDENTITY(1,1) PRIMARY KEY,
+	ReparacionID INT,
+	Descripcion VARCHAR(255) DEFAULT '_' ,
+	FechaFinalizacion DATETIME,
+	FOREIGN KEY (ReparacionID) REFERENCES Reparaciones(ReparacionID)
+	);
+
+-- =====================================
+/*Se llenan las tablas con los datos*/
+
+-- INSERCIÓN DE USUARIOS
+INSERT INTO Usuarios (CedulaID, Nombre, CorreoElectronico, Telefono) VALUES
+	('218700509','Samantha Flores','Samfl@email.com','8888-1201'),
+	('118590255','Ezequiel FLores','Ezekfl@email.com','8888-2334'),
+	('145094515','Leiber Aguero','Leibag@email.com','8888-3412'),
+	('215850442','Katherine Rojas','Kathro@email.com','8888-4555'),
+	('109854211','JUAN Morales','smorales@email.com','8888-5987');
+
+-- INSERCIÓN DE TECNICOS
+INSERT INTO Tecnicos (Nombre, Especialidad) VALUES
+	('Mario Calderon','Hardware'),
+	('Andrea Salas','Software'),
+	('Jorge Castillo','Redes'),
+	('Paula Rojas','Laptop'),
+	('Ricardo Vega','Celulares');
+
+-- INSERCIÓN DE EQUIPOS
+INSERT INTO Equipos (Modelo, Marca, UsuarioID) VALUES
+	('Inspiron 15 - SN02JX38','Dell',1),
+	('Pavilion Gaming - SN77AB21','HP',2),
+	('ThinkPad T14 - SN19XZ44','Lenovo',3),
+	('Iphone 25 - SNAPPLE22','Apple',4),
+	('Aspire 5 - SNACER88','HP',5);
+
+-- =====================================
+
+--SE CREA EL PROCEDIMIENTO sp_RegistarReparacion
+
+GO
+CREATE PROCEDURE sp_RegistrarReparacion
+	@EquipoID INT, 
+	@FechaSolicitud DATETIME
+	AS
+	BEGIN
+		INSERT INTO Reparaciones (EquipoID, FechaSolicitud)
+		VALUES (@EquipoID, @FechaSolicitud);
+	END;
+GO
+
+--se ejecuta el comando
+/*se debe de ingrar dato a dato. (Selecionar todos juntos por ser prueba*/
+EXEC sp_RegistrarReparacion 1,'2026-02-10'
+EXEC sp_RegistrarReparacion 2,'2026-02-15'
+EXEC sp_RegistrarReparacion 3,'2026-02-22'
+EXEC sp_RegistrarReparacion 4,'2026-02-22'
+
+--Se prueba
+SELECT * FROM Reparaciones
+
+
+--SE CREA EL PROCEDIMIENTO sp_AsignarTecnico
+GO
+CREATE PROCEDURE sp_AsignarTecnico
+	@ReparacionID INT,
+	@TecnicoID INT
+	AS
+	BEGIN
+		INSERT INTO Asignaciones (ReparacionID, TecnicoID)
+		VALUES (@ReparacionID, @TecnicoID);
+	END;
+GO
+
+/* SE DEBEN CAMBIAR LOS SIGNOS "3,3" AL EXEC DE 
+sp_AsignarTecnico mis combinaciones fueron
+*/
+EXEC sp_AsignarTecnico 1,4
+EXEC sp_AsignarTecnico 2,1
+EXEC sp_AsignarTecnico 3,2
+EXEC sp_AsignarTecnico 4,3
+
+/*Por ejemplo: deseo solucionar Problemas de Hardware de un Iphone
+('Mario Calderon','Hardware') = 1
+('Iphone 25 - SNAPPLE22','Apple',4) = 4*/
+
+
+--Se hace Prueba
+SELECT * FROM Reparaciones
+SELECT * FROM Asignaciones 
+
+
+/* Se crea el TRIGGER QUE NOS DICE
+Cuando se actualice con el (UPDATE) la tabla DetallesReparaciones
+la columna Estado cambiará a 'Completado' automaticamente*/
+GO
+CREATE TRIGGER trg_FinalizarReparacion 
+	ON DetallesReparacion
+	AFTER INSERT
+	AS
+	BEGIN
+		UPDATE Reparaciones
+		SET Estado = 'Completado'
+		WHERE ReparacionID IN (SELECT ReparacionID FROM inserted);
+	END;
+GO
+
+/*se hace primera prueba donde todos aparecen Pendientes*/
+
+SELECT * FROM Reparaciones;
+
+/*Se ingresan los DetallesReparacion llenando la tabla correspondiente*/
+INSERT INTO DetallesReparacion (ReparacionID, Descripcion, FechaFinalizacion)
+VALUES 
+	(1, 'Se reemplazó la pantalla del equipo', GETDATE()),
+	(2,'Reinstalación del sistema operativo', GETDATE()),
+	(3,'Limpieza interna',GETDATE());
+
+/*Se hace segunda prueba para ver la actualizacion de la columna Estado*/
+SELECT * FROM Reparaciones;
+SELECT * FROM DetallesReparacion;
+
+/*Se actualizan las tablas correctamente.*/
+
+SELECT 
+	Usuarios.Nombre AS Usuario,
+	Equipos.Modelo,
+	Tecnicos.Nombre AS Tecnico
+	FROM Asignaciones
+	INNER JOIN Reparaciones ON Asignaciones.ReparacionID = Reparaciones.ReparacionID
+	INNER JOIN Equipos ON Reparaciones.EquipoID = Equipos.EquipoID
+	INNER JOIN Usuarios ON Equipos.UsuarioID = Usuarios.UsuarioID
+	INNER JOIN Tecnicos ON Asignaciones.TecnicoID = Tecnicos.TecnicoID;
+
+	/*Se visualiza correctamente las tablas correctamente con la informacion*/
+
+SELECT TecnicoID, COUNT(ReparacionID) AS TotalReparaciones
+	FROM Asignaciones
+	GROUP BY TecnicoID;
+
+/*Aqui utiliza
+GROUP BY
+COUNT()
+Para contar cuántas reparaciones tiene cada técnico.*/ 
+
+/*Se visualiza correctamente*/
+
+
+
+SELECT *
+	FROM Equipos
+	WHERE Marca = 'HP';
+	
+/*WHERE para filtrar datos.
+Esta consulta busca:
+equipos HP */
+
+
+-- Consulta Final
+SELECT * FROM Usuarios;
+SELECT * FROM Equipos;
+SELECT * FROM Tecnicos;
+SELECT * FROM Reparaciones;
+SELECT * FROM Asignaciones;
+SELECT * FROM DetallesReparacion;
+
+
+--Consulta Extra
+/*Esta consulta busca a un usuario usando su CedulaID, columna agregada a la tabla Usuarios. 
+Luego muestra los equipos que tiene registrados,
+las reparaciones que se han realizado a esos equipos y los detalles de cada reparación. 
+
+Esto se logra usando los comandos:
+
+	SELECT: Seleccionando la informacion que se busque 
+	mostrar de cada tabla
+
+	INNER JOIN: Une las tablas mostrando solo los datos 
+	que coinciden entre ellas.
+
+	LEFT JOIN: Permite mostrar todas las reparaciones 
+	aunque no tengan todavía un detalle registrado.
+
+	WHERE: Filtra la CedulaID para encontrar al usuario 
+	específico que se desea consultar.*/
+
+
+SELECT 
+    Usuarios.CedulaID,
+    Usuarios.Nombre,
+    Equipos.EquipoID,
+    Equipos.Modelo,
+    Equipos.Marca,
+    Reparaciones.ReparacionID,
+    Reparaciones.FechaSolicitud,
+    Reparaciones.Estado,
+    DetallesReparacion.DetalleID,
+    DetallesReparacion.Descripcion,
+    DetallesReparacion.FechaFinalizacion
+FROM Usuarios
+INNER JOIN Equipos
+    ON Usuarios.UsuarioID = Equipos.UsuarioID
+INNER JOIN Reparaciones
+    ON Equipos.EquipoID = Reparaciones.EquipoID
+LEFT JOIN DetallesReparacion
+    ON Reparaciones.ReparacionID = DetallesReparacion.ReparacionID
+WHERE Usuarios.CedulaID = '145094515';
+
+/*  Probar con:
+	('218700509','Samantha Flores','Samfl@email.com','8888-1201'),
+	('118590255','Ezequiel FLores','Ezekfl@email.com','8888-2334'),
+	('145094515','Leiber Aguero','Leibag@email.com','8888-3412'),
+	('215850442','Katherine Rojas','Kathro@email.com','8888-4555'),  */
